@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <title>聊天室</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header-wrapper">
+        <h3>当前在线人数：<span id="client-amount"></span></h3>
+      </div>
+      <div class="message-wrapper">
+        <div id="messages" class="scroll-start-at-bottom"></div>
+      </div>
+      <div class="input-wrapper">
+        <input
+          type="text"
+          placeholder="发送消息"
+          id="msg-input-box"
+          class="msg-input"
+        />
+        <button id="msg-send-btn" class="msg-btn" type="button">发送</button>
+      </div>
+    </div>
+    <script>
+      const clinetAmount = document.getElementById('client-amount');
+
+      const ws = new WebSocket('ws://localhost:7071');
+
+      ws.onopen = () => {
+        console.log('Websocket connection established');
+      };
+
+      ws.onmessage = function (message) {
+        const msgBubble = document.createElement('div');
+        msgBubble.classList.add('msg-bubble');
+        if (message.data instanceof Blob) {
+          reader = new FileReader();
+          reader.onload = () => {
+            console.log('message: ' + reader.result);
+            if (reader.result.startsWith('clinetAmount-')) {
+              clinetAmount.innerHTML = reader.result.split('-')[1];
+            } else {
+              msgBubble.innerHTML = reader.result;
+              document.getElementById('messages').appendChild(msgBubble);
+            }
+          };
+          reader.readAsText(message.data);
+        } else {
+          console.log('message: ' + message.data);
+          if (message.data.startsWith('clinetAmount-')) {
+            clinetAmount.innerHTML = message.data.split('-')[1];
+          } else {
+            msgBubble.innerHTML = message.data;
+            document.getElementById('messages').appendChild(msgBubble);
+          }
+        }
+      };
+
+      ws.onerror = error => {
+        console.log(error);
+      };
+
+      ws.onclose = () => {
+        alertMsg('「系统消息」链接已断开');
+        console.log('服务器链接已关闭');
+      };
+
+      const sendBtn = document.getElementById('msg-send-btn');
+      const msgInput = document.getElementById('msg-input-box');
+
+      sendBtn.addEventListener('click', () => {
+        const msgContent = document.getElementById('msg-input-box').value;
+        if (ws.readyState === ws.OPEN) {
+          if (msgContent !== '') {
+            ws.send(msgContent);
+          }
+        } else {
+          alertMsg('「系统消息」链接已断开');
+        }
+        document.getElementById('msg-input-box').value = '';
+      });
+
+      msgInput.addEventListener('keypress', function onEvent(event) {
+        if (event.key === 'Enter') {
+          sendBtn.click();
+        }
+      });
+
+      function alertMsg(text) {
+        const msgBubble = document.createElement('div');
+        msgBubble.classList.add('msg-bubble');
+        msgBubble.innerHTML = text;
+        document.getElementById('messages').appendChild(msgBubble);
+      }
+    </script>
+  </body>
+</html>

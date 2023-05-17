@@ -1,0 +1,121 @@
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  color: #213547;
+  background: #f9f9f9;
+}
+
+body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.container {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+}
+
+/* .container > * {
+  border: 1px red solid;
+} */
+
+.header-wrapper {
+  height: 50px;
+  width: 100%;
+  background-color: #f2f2f2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.header-wrapper h3 {
+  margin-right: 30px;
+}
+
+.message-wrapper {
+  flex: 1;
+  width: 100%;
+  background-color: #f2f2f2;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow-y: scroll;
+}
+
+.scroll-start-at-bottom {
+  flex: 1 1 0%;
+}
+
+.msg-bubble {
+  width: fit-content;
+  max-width: 70%;
+  font-size: 15px;
+  border-radius: 10px;
+  background-color: #07c160;
+  padding: 10px 13px;
+  margin: 20px 0 10px 20px;
+}
+
+.input-wrapper {
+  height: 90px;
+  width: 100%;
+  padding-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #e5e5e5;
+}
+
+.msg-input {
+  height: 60%;
+  flex: 3;
+  margin: 0 10px 0 20px;
+  font-size: 15px;
+  border: none;
+  border-radius: 4px;
+  padding: 0 10px;
+}
+
+.msg-btn {
+  height: 60%;
+  flex: 1;
+  margin: 0 20px 0 10px;
+  font-size: 15px;
+  font-weight: 500;
+  background-color: #07c160;
+  color: #fff;
+  appearance: none;
+  user-select: none;
+  outline: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
