@@ -23,6 +23,13 @@ a:active {
   color: inherit;
 }
 
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}
+
 html,
 body {
   width: 100%;
@@ -41,4 +48,8 @@ body {
   text-rendering: optimizelegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  overflow: hidden;
 }
