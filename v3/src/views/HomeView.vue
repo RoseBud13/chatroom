@@ -2,6 +2,12 @@
   <div class="layout-conatianer">
     <div class="left-panel">
       <div class="room-list">
+        <div class="left-panel-header">
+          <IconAvatar
+            style="cursor: pointer"
+            @click="globalStore.toggleUserPage"
+          ></IconAvatar>
+        </div>
         <RoomCard
           v-for="room in chatroomList"
           :roomID="room"
@@ -32,6 +38,7 @@
               v-for="msg in filteredMsgBuffer"
               :msg="msg.content"
               :isSender="msg.sender === clientID"
+              :avatarUrl="msg.avatar"
             ></MessageBubble>
           </div>
         </div>
@@ -75,7 +82,23 @@
         验证邀请码
       </button>
     </div>
-    <div class="disconnected" v-if="!connected">连接已中断</div>
+    <div class="user-page" ref="userPage">
+      <div class="user-avatar-wrapper">
+        <img :src="avatarUrl" alt="avatar" />
+      </div>
+      <button class="avatar-btn" type="button" @click="shuffleAvatar">
+        换一个
+      </button>
+      <div class="close-user-page" @click="globalStore.toggleUserPage">
+        <IconCloseRound></IconCloseRound>
+      </div>
+    </div>
+    <div class="disconnected" v-if="!connected && showDisconnnectAlert">
+      连接已中断<IconCloseRound
+        style="margin-left: 20px; cursor: pointer"
+        @click="closeDisconnectAlert"
+      ></IconCloseRound>
+    </div>
   </div>
 </template>
 
@@ -86,26 +109,29 @@ import RoomCard from '@/components/RoomCard.vue';
 import MessageBubble from '@/components/MessageBubble.vue';
 import IconLogoutLeft from '@/components/icons/IconLogoutLeft.vue';
 import IconCloseRound from '@/components/icons/IconCloseRound.vue';
+import IconAvatar from '@/components/icons/IconAvatar.vue';
 import { useChatroomStore } from '@/stores/chatroom';
 import { useGlobalStore } from '@/stores/global';
-import { generateID } from '@/utils/genStr';
+import { generateID, randomIntFromInterval } from '@/utils/random';
 
 const toast = inject('toast');
 
 const chatbox = ref(null);
 const rightContainer = ref(null);
 const joinForm = ref(null);
+const userPage = ref(null);
 const msgInput = ref(null);
 const mobileMode = ref(false);
 
 const msg = ref('');
 const authMsg = ref('');
+const showDisconnnectAlert = ref(false);
 
 const chatroomStore = useChatroomStore();
 const { isInChatroom, chatroomList, currentRoomID, roomInfo, msgBuffer } =
   storeToRefs(chatroomStore);
 const globalStore = useGlobalStore();
-const { showJoinForm, wsSysMsg, clientID, connected } =
+const { showJoinForm, wsSysMsg, clientID, connected, avatarUrl, showUserPage } =
   storeToRefs(globalStore);
 
 const ws = new WebSocket('ws://localhost:7071');
@@ -142,6 +168,9 @@ ws.onmessage = function (message) {
           if (clientID.value === null) {
             globalStore.setClientID(generateID(5));
           }
+          if (avatarUrl.value === null) {
+            globalStore.setAvatarUrl(randomIntFromInterval(1, 100));
+          }
           chatroomStore.addChatroom(parsedMsg.content);
           registerClient(clientID.value, parsedMsg.content);
         } else if (parsedMsg.contentType === 'clientSize') {
@@ -157,6 +186,7 @@ ws.onmessage = function (message) {
           let msgData = {
             room: parsedMsg.roomID,
             sender: parsedMsg.senderID,
+            avatar: parsedMsg.senderAvatar,
             timestamp: parsedMsg.timestamp,
             content: parsedMsg.content
           };
@@ -234,6 +264,7 @@ const handleSentMsg = event => {
       contentType: 'msgText',
       content: msg.value,
       senderID: clientID.value,
+      senderAvatar: avatarUrl.value,
       roomID: currentRoomID.value,
       timestamp: Date.now()
     };
@@ -259,6 +290,14 @@ const setChatroom = (isIn, isMobile) => {
   }
 };
 
+const closeDisconnectAlert = () => {
+  showDisconnnectAlert.value = false;
+};
+
+const shuffleAvatar = () => {
+  globalStore.setAvatarUrl(randomIntFromInterval(1, 100));
+};
+
 watch(isInChatroom, () => {
   setChatroom(isInChatroom.value, mobileMode.value);
 });
@@ -271,6 +310,22 @@ watch(showJoinForm, () => {
   }
 });
 
+watch(showUserPage, () => {
+  if (showUserPage.value) {
+    userPage.value.style = 'right:0;';
+  } else {
+    userPage.value.style = 'right:100%;';
+  }
+});
+
+watch(connected, () => {
+  if (connected.value === false) {
+    showDisconnnectAlert.value = true;
+  } else {
+    showDisconnnectAlert.value = false;
+  }
+});
+
 onMounted(() => {
   if (window.innerWidth < 900) {
     mobileMode.value = true;
@@ -278,6 +333,9 @@ onMounted(() => {
   }
   if (!showJoinForm.value) {
     joinForm.value.style = 'top:100%;';
+  }
+  if (!showUserPage.value) {
+    userPage.value.style = 'right:100%;';
   }
   setChatroom(isInChatroom.value, mobileMode.value);
   msgInput.value.addEventListener('keydown', e => {
@@ -320,12 +378,24 @@ onBeforeUnmount(() => {
   max-width: 600px;
   height: fit-content;
   max-height: 80%;
-  padding-top: 50px;
+  padding-top: 20px;
   display: flex;
   justify-content: space-evenly;
   align-items: flex-start;
   flex-wrap: wrap;
   overflow-y: auto;
+}
+
+.left-panel-header {
+  position: relative;
+  width: 100%;
+  height: 50px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  font-size: 33px;
+  font-weight: bold;
+  padding-left: 22px;
 }
 
 .room-add {
@@ -505,6 +575,58 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.user-page {
+  position: absolute;
+  top: 0;
+  // right: 100%;
+  width: 100%;
+  height: 100%;
+  background-color: var(--main-theme-white-mute);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+  transition: all 0.2s ease-in-out;
+}
+
+.user-avatar-wrapper {
+  position: relative;
+  height: 90px;
+  width: 90px;
+}
+
+.user-avatar-wrapper img {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
+.avatar-btn {
+  height: 30px;
+  width: 90px;
+  margin: 50px 0;
+  font-size: 15px;
+  font-weight: 500;
+  background-color: var(--main-theme-green);
+  color: #fff;
+  appearance: none;
+  user-select: none;
+  outline: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.close-user-page {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  font-size: 25px;
+  color: var(--main-theme-green);
+  cursor: pointer;
+}
+
 .disconnected {
   position: absolute;
   top: 0;
@@ -516,6 +638,7 @@ onBeforeUnmount(() => {
   align-items: center;
   color: #fff;
   font-size: 16px;
+  z-index: 10;
 }
 
 @media (max-width: 900px) {

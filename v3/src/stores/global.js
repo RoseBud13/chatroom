@@ -6,7 +6,9 @@ export const useGlobalStore = defineStore('global', {
     showJoinForm: Local.get('client-id') ? false : true,
     wsSysMsg: {},
     clientID: Local.get('client-id') || null,
-    connected: false
+    connected: false,
+    avatarUrl: Local.get('avatar') || null,
+    showUserPage: false
   }),
   actions: {
     toggleShowJoinForm() {
@@ -21,6 +23,16 @@ export const useGlobalStore = defineStore('global', {
     },
     updateConnection(status) {
       this.connected = status;
+    },
+    setAvatarUrl(random) {
+      this.avatarUrl =
+        'https://b612-static-rsrcs-1306125602.cos.ap-shanghai.myqcloud.com/random-avatar/' +
+        random +
+        '.png';
+      Local.set('avatar', this.avatarUrl);
+    },
+    toggleUserPage() {
+      this.showUserPage = !this.showUserPage;
     }
   }
 });

@@ -5,9 +5,11 @@ const wss = new WebSocketServer({ port: 7071 });
 const roomList = {
   sparksfly: '泰裤辣',
   test123gogo: '测试群',
-  test123a: '测试群1',
-  test123b: '测试群2',
-  test123c: '测试群3'
+  test123acsd: '测试群1',
+  test123bggve: '测试群2',
+  test123ccsw: '测试群3',
+  test123dtgd: '今晚吃什么',
+  test123eljf: '我真的好饿'
 };
 const clientRoomMap = {};
 
@@ -120,6 +122,7 @@ wss.on('connection', function connection(ws, req) {
             contentType: 'msgBroadcast',
             content: parsedMsg.content,
             senderID: parsedMsg.senderID,
+            senderAvatar: parsedMsg.senderAvatar,
             roomID: parsedMsg.roomID,
             timestamp: parsedMsg.timestamp
           };
