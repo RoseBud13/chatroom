@@ -2,9 +2,12 @@
   <div class="layout-conatianer">
     <div class="left-panel">
       <div class="room-list">
-        <RoomCard @click="chatroomStore.enterChatroom"></RoomCard>
-        <RoomCard @click="chatroomStore.enterChatroom"></RoomCard>
-        <RoomCard @click="chatroomStore.enterChatroom"></RoomCard>
+        <RoomCard
+          v-for="room in chatroomList"
+          :roomID="room"
+          :roomSize="roomInfo[room]"
+          @click="chatroomStore.enterChatroom(room)"
+        ></RoomCard>
       </div>
       <div class="room-add">
         <div class="add-btn" @click="globalStore.toggleShowJoinForm">+</div>
@@ -16,24 +19,20 @@
           <div class="exit-btn" @click="chatroomStore.exitChatroom">
             <IconLogoutLeft></IconLogoutLeft>
           </div>
-          <h3>当前在线人数：<span class="client-amount">13</span></h3>
+          <h3>{{ currentRoomID }}</h3>
+          <h5>
+            当前在线人数：<span class="client-amount">{{
+              roomInfo[currentRoomID]
+            }}</span>
+          </h5>
         </div>
         <div class="message-wrapper">
           <div id="messages" class="scroll-start-at-bottom">
-            <MessageBubble msg="test"></MessageBubble>
-            <MessageBubble msg="hi"></MessageBubble>
-            <MessageBubble msg="你好" isSender></MessageBubble>
-            <MessageBubble msg="哈哈哈哈哈哈哈哈哈哈" isSender></MessageBubble>
-            <MessageBubble msg="哈哈哈哈哈哈哈哈哈哈" isSender></MessageBubble>
-            <MessageBubble msg="哈哈哈哈哈哈哈哈哈哈" isSender></MessageBubble>
-            <MessageBubble msg="test"></MessageBubble>
-            <MessageBubble msg="hi"></MessageBubble>
-            <MessageBubble msg="test"></MessageBubble>
-            <MessageBubble msg="hi"></MessageBubble>
-            <MessageBubble msg="test"></MessageBubble>
-            <MessageBubble msg="hi"></MessageBubble>
-            <MessageBubble msg="哈哈哈哈哈哈哈哈哈哈" isSender></MessageBubble>
-            <MessageBubble msg="哈哈哈哈哈哈哈哈哈哈" isSender></MessageBubble>
+            <MessageBubble
+              v-for="msg in filteredMsgBuffer"
+              :msg="msg.content"
+              :isSender="msg.sender === clientID"
+            ></MessageBubble>
           </div>
         </div>
         <div class="input-wrapper">
@@ -43,13 +42,26 @@
             id="msg-input-box"
             class="msg-input"
             autocomplete="off"
+            v-model="msg"
+            ref="msgInput"
           />
-          <button id="msg-send-btn" class="msg-btn" type="button">发送</button>
+          <button
+            id="msg-send-btn"
+            class="msg-btn"
+            type="button"
+            @click="handleSentMsg"
+          >
+            发送
+          </button>
         </div>
       </div>
     </div>
     <div class="join-form" ref="joinForm">
-      <div class="close-join-form" @click="globalStore.toggleShowJoinForm">
+      <div
+        class="close-join-form"
+        @click="globalStore.toggleShowJoinForm"
+        v-if="clientID"
+      >
         <IconCloseRound></IconCloseRound>
       </div>
       <input
@@ -57,14 +69,18 @@
         placeholder="邀请码"
         class="join-input"
         autocomplete="off"
+        v-model="authMsg"
       />
-      <button class="join-btn" type="button">验证邀请码</button>
+      <button class="join-btn" type="button" @click="handleAuth">
+        验证邀请码
+      </button>
     </div>
+    <div class="disconnected" v-if="!connected">连接已中断</div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount, inject, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import RoomCard from '@/components/RoomCard.vue';
 import MessageBubble from '@/components/MessageBubble.vue';
@@ -72,16 +88,160 @@ import IconLogoutLeft from '@/components/icons/IconLogoutLeft.vue';
 import IconCloseRound from '@/components/icons/IconCloseRound.vue';
 import { useChatroomStore } from '@/stores/chatroom';
 import { useGlobalStore } from '@/stores/global';
+import { generateID } from '@/utils/genStr';
+
+const toast = inject('toast');
 
 const chatbox = ref(null);
 const rightContainer = ref(null);
 const joinForm = ref(null);
+const msgInput = ref(null);
 const mobileMode = ref(false);
 
+const msg = ref('');
+const authMsg = ref('');
+
 const chatroomStore = useChatroomStore();
-const { isInChatroom } = storeToRefs(chatroomStore);
+const { isInChatroom, chatroomList, currentRoomID, roomInfo, msgBuffer } =
+  storeToRefs(chatroomStore);
 const globalStore = useGlobalStore();
-const { showJoinForm } = storeToRefs(globalStore);
+const { showJoinForm, wsSysMsg, clientID, connected } =
+  storeToRefs(globalStore);
+
+const ws = new WebSocket('ws://localhost:7071');
+
+ws.onopen = () => {
+  console.log('Websocket connection established');
+  globalStore.updateConnection(true);
+  if (clientID.value && chatroomList.value.length > 0) {
+    for (const room of chatroomList.value) {
+      reAssignClient(clientID.value, room);
+    }
+  }
+};
+
+ws.onmessage = function (message) {
+  if (message.data instanceof Blob) {
+    reader = new FileReader();
+    reader.onload = () => {
+      console.log('message: ' + reader.result, 'blob');
+    };
+    reader.readAsText(message.data);
+  } else {
+    console.log('message: ' + message.data, 'text');
+    let parsedMsg = JSON.parse(message.data);
+
+    switch (parsedMsg.type) {
+      case 'system':
+        globalStore.updateWsSysMsg(parsedMsg);
+        if (wsSysMsg.value.contentType === 'authFailed') {
+          toast('邀请码无效', 'warn');
+        } else if (wsSysMsg.value.contentType === 'authSuccess') {
+          toast('验证成功', 'success');
+          globalStore.toggleShowJoinForm();
+          if (clientID.value === null) {
+            globalStore.setClientID(generateID(5));
+          }
+          chatroomStore.addChatroom(parsedMsg.content);
+          registerClient(clientID.value, parsedMsg.content);
+        } else if (parsedMsg.contentType === 'clientSize') {
+          let data = {
+            room: parsedMsg.roomID,
+            size: parsedMsg.size
+          };
+          chatroomStore.setRoomInfo(data);
+        }
+        break;
+      case 'message':
+        if (parsedMsg.contentType === 'msgBroadcast') {
+          let msgData = {
+            room: parsedMsg.roomID,
+            sender: parsedMsg.senderID,
+            timestamp: parsedMsg.timestamp,
+            content: parsedMsg.content
+          };
+          chatroomStore.updateMsg(msgData);
+        }
+    }
+  }
+};
+
+ws.onerror = error => {
+  console.log(error);
+};
+
+ws.onclose = () => {
+  toast('「系统消息」链接已断开', 'success');
+  console.log('服务器链接已关闭');
+  globalStore.updateConnection(false);
+  chatroomStore.clearRoomSize();
+};
+
+const filteredMsgBuffer = computed(() => {
+  let filtered = [];
+  msgBuffer.value.forEach(element => {
+    if (element.room === currentRoomID.value) {
+      filtered.push(element);
+    }
+  });
+  return filtered;
+});
+
+const handleAuth = () => {
+  if (authMsg.value) {
+    const authObj = {
+      auth: '2233',
+      type: 'system',
+      contentType: 'auth',
+      content: authMsg.value,
+      timestamp: Date.now()
+    };
+    console.log(authObj);
+    ws.send(JSON.stringify(authObj));
+    authMsg.value = '';
+  }
+};
+
+const registerClient = (client, room) => {
+  const clientInfo = {
+    auth: '2233',
+    type: 'system',
+    contentType: 'registerClient',
+    clientID: client,
+    roomID: room,
+    timestamp: Date.now()
+  };
+  ws.send(JSON.stringify(clientInfo));
+};
+
+const reAssignClient = (client, room) => {
+  const clientInfo = {
+    auth: '2233',
+    type: 'system',
+    contentType: 'reAssignClient',
+    clientID: client,
+    roomID: room,
+    timestamp: Date.now()
+  };
+  ws.send(JSON.stringify(clientInfo));
+};
+
+const handleSentMsg = event => {
+  if (msg.value && !event.isComposing) {
+    const msgObj = {
+      auth: '2233',
+      type: 'message',
+      contentType: 'msgText',
+      content: msg.value,
+      senderID: clientID.value,
+      roomID: currentRoomID.value,
+      timestamp: Date.now()
+    };
+    // console.log(msgObj);
+    ws.send(JSON.stringify(msgObj));
+    msg.value = '';
+  }
+};
 
 const setChatroom = (isIn, isMobile) => {
   if (isIn) {
@@ -116,7 +276,23 @@ onMounted(() => {
     mobileMode.value = true;
     chatbox.value.classList.remove('chat-container-hidden');
   }
+  if (!showJoinForm.value) {
+    joinForm.value.style = 'top:100%;';
+  }
   setChatroom(isInChatroom.value, mobileMode.value);
+  msgInput.value.addEventListener('keydown', e => {
+    if (e.code === 'Enter') {
+      handleSentMsg(e);
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  msgInput.value.addEventListener('keydown', e => {
+    if (e.code === 'Enter') {
+      handleSentMsg(e);
+    }
+  });
 });
 </script>
 
@@ -200,6 +376,7 @@ onMounted(() => {
 }
 
 .header-wrapper {
+  position: relative;
   height: 50px;
   width: 100%;
   background-color: #f2f2f2;
@@ -217,6 +394,12 @@ onMounted(() => {
 }
 
 .header-wrapper h3 {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.header-wrapper h5 {
   margin-right: 30px;
 }
 
@@ -275,7 +458,7 @@ onMounted(() => {
 
 .join-form {
   position: absolute;
-  top: 100%;
+  // top: 0;
   left: 0;
   width: 100%;
   height: 100%;
@@ -320,6 +503,19 @@ onMounted(() => {
   font-size: 25px;
   color: var(--main-theme-green);
   cursor: pointer;
+}
+
+.disconnected {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 50px;
+  background-color: rgb(252, 145, 145);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-size: 16px;
 }
 
 @media (max-width: 900px) {

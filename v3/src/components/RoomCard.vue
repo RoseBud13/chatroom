@@ -1,14 +1,18 @@
 <template>
   <div class="roomcard-wrapper">
-    <div class="roomcard-logo">🏠</div>
+    <div class="roomcard-logo">
+      🏠 <span class="room-name">{{ roomID }}</span>
+    </div>
     <div class="roomcard-main"></div>
     <div class="roomcard-footer">
-      在线人数：<span class="client-amount">13</span>
+      在线人数：<span class="client-amount"> {{ roomSize }}</span>
     </div>
   </div>
 </template>
 
-<script setup></script>
+<script setup>
+defineProps(['roomID', 'roomSize']);
+</script>
 
 <style lang="scss" scoped>
 .roomcard-wrapper {
@@ -52,6 +56,12 @@
 
 .client-amount {
   color: var(--main-theme-green);
+}
+
+.room-name {
+  font-size: 17px;
+  font-weight: bold;
+  color: var(--main-theme-indigo);
 }
 
 @media (max-width: 900px) {
