@@ -23,8 +23,9 @@
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 20px);
   overflow: hidden;
   background-color: #fff;
+  margin-bottom: 20px;
 }
 </style>
