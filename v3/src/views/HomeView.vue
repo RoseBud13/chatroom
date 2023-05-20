@@ -144,7 +144,9 @@ const globalStore = useGlobalStore();
 const { showJoinForm, wsSysMsg, clientID, connected, avatarUrl, showUserPage } =
   storeToRefs(globalStore);
 
-let wsStatusCheckingInterval = null;
+const wsStatusCheckingInterval = ref(null);
+const wsInstance = ref(null);
+const connectionError = ref(false);
 
 const connect = () => {
   const ws = new WebSocket('ws://localhost:7071');
@@ -155,12 +157,13 @@ const connect = () => {
     ws.onopen = () => {
       console.log('Websocket connection established');
       globalStore.updateConnection(true);
+      connectionError.value = false;
       if (clientID.value && chatroomList.value.length > 0) {
         for (const room of chatroomList.value) {
-          reAssignClient(clientID.value, room);
+          reAssignClient(ws, clientID.value, room);
         }
       }
-      resolve(connected.value);
+      resolve(ws);
     };
 
     ws.onmessage = function (message) {
@@ -189,7 +192,7 @@ const connect = () => {
                 globalStore.setAvatarUrl(randomIntFromInterval(1, 100));
               }
               chatroomStore.addChatroom(parsedMsg.content);
-              registerClient(clientID.value, parsedMsg.content);
+              registerClient(ws, clientID.value, parsedMsg.content);
             } else if (parsedMsg.contentType === 'clientSize') {
               let data = {
                 room: parsedMsg.roomID,
@@ -214,7 +217,8 @@ const connect = () => {
     };
 
     ws.onerror = error => {
-      toast('「系统消息」连接出故障', 'success');
+      connectionError.value = true;
+      toast('「系统消息」连接出故障', 'warn');
       console.log('服务器连接接出故障：', error);
       globalStore.updateConnection(false);
       chatroomStore.clearRoomSize();
@@ -222,8 +226,10 @@ const connect = () => {
     };
 
     ws.onclose = error => {
-      toast('「系统消息」连接已断开', 'success');
-      console.log('服务器连接已关闭');
+      if (connectionError.value !== true) {
+        toast('连接已断开, 重新连接中...', 'success');
+        console.log('服务器连接已关闭, 重新连接中...');
+      }
       globalStore.updateConnection(false);
       chatroomStore.clearRoomSize();
       reject(error);
@@ -233,9 +239,9 @@ const connect = () => {
 
 async function reconnect() {
   try {
-    await connect();
+    connect().then(ws => (wsInstance.value = ws));
   } catch (err) {
-    console.log('WEBSOCKET_RECONNECT: Error', new Error(err).message);
+    console.log('WEBSOCKET_RECONNECT: Error', err);
   }
 }
 
@@ -261,12 +267,12 @@ const handleAuth = () => {
       timestamp: Date.now()
     };
     console.log(authObj);
-    ws.send(JSON.stringify(authObj));
+    wsInstance.value.send(JSON.stringify(authObj));
     authMsg.value = '';
   }
 };
 
-const registerClient = (client, room) => {
+const registerClient = (ws, client, room) => {
   const clientInfo = {
     auth: '2233',
     type: 'system',
@@ -278,7 +284,7 @@ const registerClient = (client, room) => {
   ws.send(JSON.stringify(clientInfo));
 };
 
-const reAssignClient = (client, room) => {
+const reAssignClient = (ws, client, room) => {
   const clientInfo = {
     auth: '2233',
     type: 'system',
@@ -303,7 +309,7 @@ const handleSentMsg = event => {
       timestamp: Date.now()
     };
     // console.log(msgObj);
-    ws.send(JSON.stringify(msgObj));
+    wsInstance.value.send(JSON.stringify(msgObj));
     msg.value = '';
   }
 };
@@ -378,7 +384,7 @@ onMounted(() => {
     }
   });
   // repeat every 5 seconds to check websocket connection
-  wsStatusCheckingInterval = setInterval(() => {
+  wsStatusCheckingInterval.value = setInterval(() => {
     if (!connected.value) {
       reconnect();
     }
@@ -391,7 +397,7 @@ onBeforeUnmount(() => {
       handleSentMsg(e);
     }
   });
-  clearInterval(wsStatusCheckingInterval);
+  clearInterval(wsStatusCheckingInterval.value);
 });
 </script>
 
