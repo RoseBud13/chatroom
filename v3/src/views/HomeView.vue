@@ -103,6 +103,7 @@
       </div>
     </div>
     <div class="disconnected" v-if="!connected && showDisconnnectAlert">
+      <div class="close-join-form" @click="() => location.reload()">刷新</div>
       连接已中断<IconCloseRound
         style="margin-left: 20px; cursor: pointer"
         @click="closeDisconnectAlert"
