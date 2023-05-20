@@ -1,17 +1,19 @@
 <template>
   <div class="roomcard-wrapper">
     <div class="roomcard-logo">
-      🏠 <span class="room-name">{{ roomID }}</span>
+      {{ roomType === 'gpt' ? '🤖️' : '🏠' }}
+      <span class="room-name">{{ roomID }}</span>
     </div>
     <div class="roomcard-main"></div>
     <div class="roomcard-footer">
-      在线人数：<span class="client-amount"> {{ roomSize }}</span>
+      {{ roomType === 'gpt' ? '' : '在线人数:'
+      }}<span class="client-amount"> {{ roomSize }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps(['roomID', 'roomSize']);
+defineProps(['roomID', 'roomSize', 'roomType']);
 </script>
 
 <style lang="scss" scoped>

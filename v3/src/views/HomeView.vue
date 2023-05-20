@@ -9,9 +9,16 @@
           ></IconAvatar>
         </div>
         <RoomCard
+          roomID="ChatGPT"
+          roomSize="Don't Panic"
+          roomType="gpt"
+          @click="chatroomStore.enterChatroom('gpt')"
+        ></RoomCard>
+        <RoomCard
           v-for="room in chatroomList"
           :roomID="room"
           :roomSize="roomInfo[room]"
+          roomType="chatroom"
           @click="chatroomStore.enterChatroom(room)"
         ></RoomCard>
       </div>
@@ -25,14 +32,15 @@
           <div class="exit-btn" @click="chatroomStore.exitChatroom">
             <IconLogoutLeft></IconLogoutLeft>
           </div>
-          <h3>{{ currentRoomID }}</h3>
-          <h5>
+          <h3>{{ currentRoomID === 'gpt' ? 'ChatGPT' : currentRoomID }}</h3>
+          <h5 v-if="currentRoomID !== 'gpt'">
             当前在线人数：<span class="client-amount">{{
               roomInfo[currentRoomID]
             }}</span>
           </h5>
+          <h5 v-else><span class="client-amount">AI</span></h5>
         </div>
-        <div class="message-wrapper">
+        <div class="message-wrapper" v-if="currentRoomID !== 'gpt'">
           <div id="messages" class="scroll-start-at-bottom">
             <MessageBubble
               v-for="msg in filteredMsgBuffer"
@@ -42,7 +50,8 @@
             ></MessageBubble>
           </div>
         </div>
-        <div class="input-wrapper">
+        <GptWrapper v-else></GptWrapper>
+        <div class="input-wrapper" v-show="currentRoomID !== 'gpt'">
           <input
             type="text"
             placeholder="发送消息"
@@ -110,6 +119,7 @@ import MessageBubble from '@/components/MessageBubble.vue';
 import IconLogoutLeft from '@/components/icons/IconLogoutLeft.vue';
 import IconCloseRound from '@/components/icons/IconCloseRound.vue';
 import IconAvatar from '@/components/icons/IconAvatar.vue';
+import GptWrapper from '@/components/GptWrapper.vue';
 import { useChatroomStore } from '@/stores/chatroom';
 import { useGlobalStore } from '@/stores/global';
 import { generateID, randomIntFromInterval } from '@/utils/random';
