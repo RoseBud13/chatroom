@@ -53,3 +53,9 @@ body {
 #app {
   overflow: hidden;
 }
+
+@media (max-width: 900px) {
+  html {
+    overflow: hidden;
+  }
+}
