@@ -103,7 +103,6 @@
       </div>
     </div>
     <div class="disconnected" v-if="!connected && showDisconnnectAlert">
-      <div class="close-join-form" @click="() => location.reload()">刷新</div>
       连接已中断<IconCloseRound
         style="margin-left: 20px; cursor: pointer"
         @click="closeDisconnectAlert"
@@ -145,78 +144,102 @@ const globalStore = useGlobalStore();
 const { showJoinForm, wsSysMsg, clientID, connected, avatarUrl, showUserPage } =
   storeToRefs(globalStore);
 
-const ws = new WebSocket('ws://localhost:7071');
+let wsStatusCheckingInterval = null;
 
-ws.onopen = () => {
-  console.log('Websocket connection established');
-  globalStore.updateConnection(true);
-  if (clientID.value && chatroomList.value.length > 0) {
-    for (const room of chatroomList.value) {
-      reAssignClient(clientID.value, room);
-    }
-  }
-};
+const connect = () => {
+  const ws = new WebSocket('ws://localhost:7071');
 
-ws.onmessage = function (message) {
-  if (message.data instanceof Blob) {
-    reader = new FileReader();
-    reader.onload = () => {
-      console.log('message: ' + reader.result, 'blob');
+  return new Promise((resolve, reject) => {
+    console.log('Client trying to connect...');
+
+    ws.onopen = () => {
+      console.log('Websocket connection established');
+      globalStore.updateConnection(true);
+      if (clientID.value && chatroomList.value.length > 0) {
+        for (const room of chatroomList.value) {
+          reAssignClient(clientID.value, room);
+        }
+      }
+      resolve(connected.value);
     };
-    reader.readAsText(message.data);
-  } else {
-    console.log('message: ' + message.data, 'text');
-    let parsedMsg = JSON.parse(message.data);
 
-    switch (parsedMsg.type) {
-      case 'system':
-        globalStore.updateWsSysMsg(parsedMsg);
-        if (wsSysMsg.value.contentType === 'authFailed') {
-          toast('邀请码无效', 'warn');
-        } else if (wsSysMsg.value.contentType === 'authSuccess') {
-          toast('验证成功', 'success');
-          globalStore.toggleShowJoinForm();
-          if (clientID.value === null) {
-            globalStore.setClientID(generateID(5));
-          }
-          if (avatarUrl.value === null) {
-            globalStore.setAvatarUrl(randomIntFromInterval(1, 100));
-          }
-          chatroomStore.addChatroom(parsedMsg.content);
-          registerClient(clientID.value, parsedMsg.content);
-        } else if (parsedMsg.contentType === 'clientSize') {
-          let data = {
-            room: parsedMsg.roomID,
-            size: parsedMsg.size
-          };
-          chatroomStore.setRoomInfo(data);
+    ws.onmessage = function (message) {
+      if (message.data instanceof Blob) {
+        reader = new FileReader();
+        reader.onload = () => {
+          console.log('message: ' + reader.result, 'blob');
+        };
+        reader.readAsText(message.data);
+      } else {
+        console.log('message: ' + message.data, 'text');
+        let parsedMsg = JSON.parse(message.data);
+
+        switch (parsedMsg.type) {
+          case 'system':
+            globalStore.updateWsSysMsg(parsedMsg);
+            if (wsSysMsg.value.contentType === 'authFailed') {
+              toast('邀请码无效', 'warn');
+            } else if (wsSysMsg.value.contentType === 'authSuccess') {
+              toast('验证成功', 'success');
+              globalStore.toggleShowJoinForm();
+              if (clientID.value === null) {
+                globalStore.setClientID(generateID(5));
+              }
+              if (avatarUrl.value === null) {
+                globalStore.setAvatarUrl(randomIntFromInterval(1, 100));
+              }
+              chatroomStore.addChatroom(parsedMsg.content);
+              registerClient(clientID.value, parsedMsg.content);
+            } else if (parsedMsg.contentType === 'clientSize') {
+              let data = {
+                room: parsedMsg.roomID,
+                size: parsedMsg.size
+              };
+              chatroomStore.setRoomInfo(data);
+            }
+            break;
+          case 'message':
+            if (parsedMsg.contentType === 'msgBroadcast') {
+              let msgData = {
+                room: parsedMsg.roomID,
+                sender: parsedMsg.senderID,
+                avatar: parsedMsg.senderAvatar,
+                timestamp: parsedMsg.timestamp,
+                content: parsedMsg.content
+              };
+              chatroomStore.updateMsg(msgData);
+            }
         }
-        break;
-      case 'message':
-        if (parsedMsg.contentType === 'msgBroadcast') {
-          let msgData = {
-            room: parsedMsg.roomID,
-            sender: parsedMsg.senderID,
-            avatar: parsedMsg.senderAvatar,
-            timestamp: parsedMsg.timestamp,
-            content: parsedMsg.content
-          };
-          chatroomStore.updateMsg(msgData);
-        }
-    }
+      }
+    };
+
+    ws.onerror = error => {
+      toast('「系统消息」连接出故障', 'success');
+      console.log('服务器连接接出故障：', error);
+      globalStore.updateConnection(false);
+      chatroomStore.clearRoomSize();
+      reject(error);
+    };
+
+    ws.onclose = error => {
+      toast('「系统消息」连接已断开', 'success');
+      console.log('服务器连接已关闭');
+      globalStore.updateConnection(false);
+      chatroomStore.clearRoomSize();
+      reject(error);
+    };
+  });
+};
+
+async function reconnect() {
+  try {
+    await connect();
+  } catch (err) {
+    console.log('WEBSOCKET_RECONNECT: Error', new Error(err).message);
   }
-};
+}
 
-ws.onerror = error => {
-  console.log(error);
-};
-
-ws.onclose = () => {
-  toast('「系统消息」链接已断开', 'success');
-  console.log('服务器链接已关闭');
-  globalStore.updateConnection(false);
-  chatroomStore.clearRoomSize();
-};
+reconnect();
 
 const filteredMsgBuffer = computed(() => {
   let filtered = [];
@@ -354,6 +377,12 @@ onMounted(() => {
       handleSentMsg(e);
     }
   });
+  // repeat every 5 seconds to check websocket connection
+  wsStatusCheckingInterval = setInterval(() => {
+    if (!connected.value) {
+      reconnect();
+    }
+  }, 5000);
 });
 
 onBeforeUnmount(() => {
@@ -362,6 +391,7 @@ onBeforeUnmount(() => {
       handleSentMsg(e);
     }
   });
+  clearInterval(wsStatusCheckingInterval);
 });
 </script>
 
