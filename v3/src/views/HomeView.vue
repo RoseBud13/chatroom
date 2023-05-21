@@ -218,8 +218,8 @@ const connect = () => {
 
     ws.onerror = error => {
       connectionError.value = true;
-      toast('「系统消息」连接出故障', 'warn');
-      console.log('服务器连接接出故障：', error);
+      toast('「系统消息」服务器故障', 'warn');
+      console.log('服务器故障：', error);
       globalStore.updateConnection(false);
       chatroomStore.clearRoomSize();
       reject(error);
@@ -386,6 +386,7 @@ onMounted(() => {
   // repeat every 5 seconds to check websocket connection
   wsStatusCheckingInterval.value = setInterval(() => {
     if (!connected.value) {
+      toast('「系统消息」重新连接中...', 'success');
       reconnect();
     }
   }, 5000);
