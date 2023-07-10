@@ -50,7 +50,7 @@
             ></MessageBubble>
           </div>
         </div>
-        <GptWrapper v-else></GptWrapper>
+        <GptWrapper :gpturl="chatgptUrl" v-else></GptWrapper>
         <div class="input-wrapper" v-show="currentRoomID !== 'gpt'">
           <input
             type="text"
@@ -123,6 +123,7 @@ import GptWrapper from '@/components/GptWrapper.vue';
 import { useChatroomStore } from '@/stores/chatroom';
 import { useGlobalStore } from '@/stores/global';
 import { generateID, randomIntFromInterval } from '@/utils/random';
+import { fileReader } from '@/utils/tools';
 
 const toast = inject('toast');
 
@@ -136,6 +137,15 @@ const mobileMode = ref(false);
 const msg = ref('');
 const authMsg = ref('');
 const showDisconnnectAlert = ref(false);
+const chatgptUrl = ref('');
+const chatgptInfo =
+  'https://file-static-1306125602.cos.ap-shanghai.myqcloud.com/json/chatgpt.json';
+
+const { fetchJson } = fileReader();
+
+fetchJson(chatgptInfo).then(data => {
+  chatgptUrl.value = data.url;
+});
 
 const chatroomStore = useChatroomStore();
 const { isInChatroom, chatroomList, currentRoomID, roomInfo, msgBuffer } =

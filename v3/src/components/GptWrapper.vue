@@ -2,14 +2,16 @@
   <div class="iframe-wrapper">
     <iframe
       data-v-555cd4d2=""
-      src="https://free.easychat.work/"
+      :src="gpturl"
       class="embedded-iframe"
       sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
     ></iframe>
   </div>
 </template>
 
-<script setup></script>
+<script setup>
+defineProps(['gpturl']);
+</script>
 
 <style lang="scss" scoped>
 .iframe-wrapper {
