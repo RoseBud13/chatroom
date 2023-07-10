@@ -1,7 +1,6 @@
 <template>
   <div class="iframe-wrapper">
     <iframe
-      data-v-555cd4d2=""
       :src="gpturl"
       class="embedded-iframe"
       sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
